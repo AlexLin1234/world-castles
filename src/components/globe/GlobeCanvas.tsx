@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useGlobeStore } from '@/store/useGlobeStore';
 import { CATEGORY_COLORS } from '@/lib/constants';
 import type { Castle } from '@/lib/schema';
@@ -12,6 +12,7 @@ type GlobeInstance = any;
 export default function GlobeCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeInstance>(null);
+  const [globeInitialized, setGlobeInitialized] = useState(false);
 
   const {
     filteredCastles,
@@ -36,7 +37,12 @@ export default function GlobeCanvas() {
 
     let globe: GlobeInstance;
     try {
-      globe = new GlobeConstructor(containerRef.current);
+      // Pass waitForGlobeReady: false so the scene is visible immediately
+      // rather than waiting for the globe texture to load (which can fail
+      // silently and leave the screen blank).
+      globe = new GlobeConstructor(containerRef.current, {
+        waitForGlobeReady: false,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn('WebGL context could not be created:', message);
@@ -44,13 +50,18 @@ export default function GlobeCanvas() {
       return;
     }
 
+    // Load initial castle data from the store so points are visible
+    // immediately — the filteredCastles effect alone misses the first
+    // render because the globe ref isn't set yet when it runs.
+    const initialCastles = useGlobeStore.getState().filteredCastles;
+
     globe
       .globeImageUrl('/textures/earth-night.jpg')
       .atmosphereColor('#1a6b9a')
       .atmosphereAltitude(0.2)
       .width(containerRef.current.clientWidth)
       .height(containerRef.current.clientHeight)
-      .pointsData([])
+      .pointsData(initialCastles)
       .pointLat((d: Castle) => d.lat)
       .pointLng((d: Castle) => d.lng)
       .pointColor((d: Castle) => CATEGORY_COLORS[d.category] ?? '#ffffff')
@@ -96,6 +107,7 @@ export default function GlobeCanvas() {
 
     globeRef.current = globe;
     setGlobeReady();
+    setGlobeInitialized(true);
 
     // Handle resize
     const handleResize = () => {
@@ -144,11 +156,11 @@ export default function GlobeCanvas() {
     };
   }, [initGlobe]);
 
-  // Update points data when filters change
+  // Update points data when filters change or when the globe finishes initializing
   useEffect(() => {
     if (!globeRef.current) return;
     globeRef.current.pointsData(filteredCastles);
-  }, [filteredCastles]);
+  }, [filteredCastles, globeInitialized]);
 
   // Fly to selected castle
   useEffect(() => {
