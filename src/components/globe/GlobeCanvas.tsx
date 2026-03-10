@@ -22,14 +22,17 @@ export default function GlobeCanvas() {
   } = useGlobeStore();
 
   const initGlobe = useCallback(async () => {
-    if (!containerRef.current) return;
-    // Bail out if a globe instance already exists (e.g. React Strict Mode double-invoke)
-    if (globeRef.current) return;
+    if (!containerRef.current || globeRef.current) return;
 
     // globe.gl types declare it as a class constructor, but runtime usage
     // requires new GlobeGL(element) — use any to bypass TypeScript's class check.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const GlobeConstructor: any = (await import('globe.gl')).default;
+
+    // Re-check after await: the component may have unmounted while the dynamic
+    // import was in flight (React Strict Mode tears down and remounts effects).
+    if (!containerRef.current || globeRef.current) return;
+
     const globe: GlobeInstance = new GlobeConstructor(containerRef.current);
 
     globe
@@ -111,9 +114,24 @@ export default function GlobeCanvas() {
 
   // Initialize globe
   useEffect(() => {
-    const cleanupPromise = initGlobe();
+    // Track whether React has already torn this effect down (Strict Mode or
+    // fast-refresh). If teardown fires before the async import resolves we
+    // call the globe's cleanup immediately inside the .then(); otherwise we
+    // store it so the synchronous return callback can call it.
+    let cleanupFn: (() => void) | undefined;
+    let cancelled = false;
+
+    initGlobe().then((fn) => {
+      if (cancelled) {
+        fn?.(); // torn down while import was in flight — clean up right now
+      } else {
+        cleanupFn = fn;
+      }
+    });
+
     return () => {
-      cleanupPromise.then((fn) => fn?.());
+      cancelled = true;
+      cleanupFn?.();
     };
   }, [initGlobe]);
 
