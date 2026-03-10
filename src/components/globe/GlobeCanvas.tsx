@@ -19,6 +19,7 @@ export default function GlobeCanvas() {
     selectCastle,
     setHovered,
     setGlobeReady,
+    setWebGLError,
   } = useGlobeStore();
 
   const initGlobe = useCallback(async () => {
@@ -33,7 +34,15 @@ export default function GlobeCanvas() {
     // import was in flight (React Strict Mode tears down and remounts effects).
     if (!containerRef.current || globeRef.current) return;
 
-    const globe: GlobeInstance = new GlobeConstructor(containerRef.current);
+    let globe: GlobeInstance;
+    try {
+      globe = new GlobeConstructor(containerRef.current);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn('WebGL context could not be created:', message);
+      setWebGLError(message);
+      return;
+    }
 
     globe
       .globeImageUrl('/textures/earth-night.jpg')

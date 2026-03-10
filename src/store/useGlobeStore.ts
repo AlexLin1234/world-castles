@@ -12,6 +12,7 @@ interface GlobeStore {
   activeRegions: Set<CastleRegion>;
   searchQuery: string;
   isGlobeReady: boolean;
+  webglError: string | null;
 
   selectCastle: (castle: Castle | null) => void;
   setHovered: (castle: Castle | null) => void;
@@ -19,6 +20,7 @@ interface GlobeStore {
   toggleRegion: (region: CastleRegion) => void;
   setSearchQuery: (q: string) => void;
   setGlobeReady: () => void;
+  setWebGLError: (msg: string) => void;
   clearFilters: () => void;
 
   filteredCastles: Castle[];
@@ -51,6 +53,7 @@ export const useGlobeStore = create<GlobeStore>((set, get) => ({
   activeRegions: new Set<CastleRegion>(),
   searchQuery: '',
   isGlobeReady: false,
+  webglError: null,
   filteredCastles: CASTLES,
 
   selectCastle: (castle) => set({ selectedCastle: castle }),
@@ -91,6 +94,8 @@ export const useGlobeStore = create<GlobeStore>((set, get) => ({
   },
 
   setGlobeReady: () => set({ isGlobeReady: true }),
+
+  setWebGLError: (msg) => set({ webglError: msg }),
 
   clearFilters: () =>
     set({
