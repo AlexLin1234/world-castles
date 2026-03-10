@@ -23,6 +23,8 @@ export default function GlobeCanvas() {
 
   const initGlobe = useCallback(async () => {
     if (!containerRef.current) return;
+    // Bail out if a globe instance already exists (e.g. React Strict Mode double-invoke)
+    if (globeRef.current) return;
 
     // globe.gl types declare it as a class constructor, but runtime usage
     // requires new GlobeGL(element) — use any to bypass TypeScript's class check.
@@ -95,6 +97,15 @@ export default function GlobeCanvas() {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      // Destroy the WebGL context so it can be recreated cleanly (e.g. HMR, Strict Mode)
+      if (globeRef.current) {
+        globeRef.current._destructor?.();
+        globeRef.current = null;
+      }
+      // Remove any leftover canvas elements the library appended
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
